@@ -1,0 +1,14 @@
+.gradle/
+.gradle-build-cache/
+build/
+app/build/
+local.properties
+keystore.properties
+release/*.jks
+*.iml
+.idea/
+.DS_Store
+*.apk
+*.aab
+emulator-*.png
+emulator-*.xml
