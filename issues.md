@@ -30,3 +30,11 @@
   - Status: Fixed.
   - Action: Installed `Transpent-release.apk` on `Medium_Phone_API_36.1` emulator and launched package `com.transpent.app` successfully.
 
+
+- Issue: Source needed to be committed and pushed to GitHub for later continuation.
+  - Status: Fixed.
+  - Action: Created local git commit, renamed branch to `main`, added remote `https://github.com/vinamrapandey/Transpent.git`, and pushed to origin.
+
+- Issue: Proper installable release artifact needed outside debug build.
+  - Status: Fixed.
+  - Action: Exported signed release APK at `C:\Users\Lenovo\Downloads\Transpent App\Transpent-release.apk`.
