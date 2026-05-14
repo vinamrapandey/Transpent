@@ -32,6 +32,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 public class MainActivity extends Activity {
+    private static final String LOCAL_ACCOUNT = "Local mode";
     private static final int REQ_ACCOUNT = 10;
     private static final int REQ_PICK_BILL = 11;
     private static final int REQ_CAMERA_BILL = 12;
@@ -61,9 +62,18 @@ public class MainActivity extends Activity {
         Button google = primary("Continue with Google");
         google.setOnClickListener(v -> chooseGoogleAccount());
         root.addView(google, matchWrap());
+        Button local = soft("Continue locally");
+        local.setOnClickListener(v -> continueLocally());
+        root.addView(local, matchWrap());
         TextView note = text("Data stays on this phone and can be backed up to your Google Drive after login.", 13, Color.GRAY);
         note.setGravity(Gravity.CENTER); note.setPadding(dp(22), dp(18), dp(22), 0); root.addView(note);
         setContentView(root);
+    }
+
+    private void continueLocally() {
+        selectedAccount = LOCAL_ACCOUNT;
+        getPreferences(0).edit().putString("googleAccount", selectedAccount).apply();
+        showHome("customers");
     }
 
     private void chooseGoogleAccount() {
@@ -241,6 +251,7 @@ public class MainActivity extends Activity {
     private void driveRestore() { new Thread(() -> { try { String token = googleToken(); String json = downloadDrive(token); if (json == null) { ui("No Drive backup found"); return; } store.fromJson(new JSONObject(json)); store.save(); runOnUiThread(() -> showHome(screen)); ui("Drive restore complete"); } catch (Exception e) { ui("Drive restore failed: " + e.getMessage()); } }).start(); }
 
     private String googleToken() throws Exception {
+        if (LOCAL_ACCOUNT.equals(selectedAccount)) throw new IllegalStateException("Sign in with Google to use Drive backup");
         AccountManager am = AccountManager.get(this); Account[] accounts = am.getAccountsByType("com.google"); Account selected = null; for (Account a : accounts) if (a.name.equals(selectedAccount)) selected = a; if (selected == null) throw new IllegalStateException("Google account not available on this phone");
         return am.blockingGetAuthToken(selected, "oauth2:https://www.googleapis.com/auth/drive.file", true);
     }

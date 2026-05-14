@@ -42,3 +42,9 @@
 - Issue: Text in customer, supplier, and product cards was clipped and partly invisible because cards were forced to a fixed 48dp height while containing padded 19-22sp text.
   - Status: Fixed.
   - Action: Changed cards to wrap their content with a safe minimum height and adjusted title text sizing/font padding so tab content remains visible.
+
+- Issue: App could not be entered on emulator or devices without completing Google account selection first.
+  - Status: Fixed.
+  - Action: Added a `Continue locally` button below Google sign-in. It opens the app immediately in local-only mode and Drive backup now asks the user to sign in with Google.
+
+  - Verification: Installed release APK on emulator, tapped Continue locally, and confirmed it opened the Customers tab with visible text and no crash logs.
