@@ -260,10 +260,10 @@ public class MainActivity extends Activity {
     private LinearLayout base() { LinearLayout l = column(); l.setPadding(dp(18), dp(18), dp(18), 0); l.setBackgroundColor(Color.rgb(247,248,250)); return l; }
     private LinearLayout column() { LinearLayout l = new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); return l; }
     private LinearLayout row() { LinearLayout l = new LinearLayout(this); l.setOrientation(LinearLayout.HORIZONTAL); return l; }
-    private LinearLayout card() { LinearLayout l = column(); l.setBackgroundResource(R.drawable.card); l.setPadding(dp(14), dp(14), dp(14), dp(14)); l.setClickable(true);  LinearLayout.LayoutParams p = matchWrap(); p.setMargins(0, dp(8), 0, dp(8)); l.setLayoutParams(p); return l; }
+    private LinearLayout card() { LinearLayout l = column(); l.setBackgroundResource(R.drawable.card); l.setPadding(dp(14), dp(12), dp(14), dp(12)); l.setClickable(true); LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2); p.setMargins(0, dp(8), 0, dp(8)); l.setLayoutParams(p); l.setMinimumHeight(dp(68)); return l; }
     private LinearLayout form() { LinearLayout l = column(); l.setPadding(dp(6), dp(4), dp(6), 0); return l; }
-    private TextView title(String s) { return text(s, 22, Color.rgb(18, 24, 38)); }
-    private TextView text(String s, int sp, int color) { TextView v = new TextView(this); v.setText(s); v.setTextSize(sp); v.setTextColor(color); v.setPadding(0, dp(3), 0, dp(3)); return v; }
+    private TextView title(String s) { TextView v = text(s, 19, Color.rgb(18, 24, 38)); v.setSingleLine(false); return v; }
+    private TextView text(String s, int sp, int color) { TextView v = new TextView(this); v.setText(s); v.setTextSize(sp); v.setTextColor(color); v.setIncludeFontPadding(true); v.setPadding(0, dp(3), 0, dp(3)); return v; }
     private TextView pill(String s) { TextView v = text(s, 13, GREEN); v.setGravity(Gravity.CENTER); v.setPadding(dp(10), 0, dp(10), 0); v.setBackgroundResource(R.drawable.soft_button); return v; }
     private Button primary(String s) { Button b = new Button(this); b.setText(s); b.setTextColor(Color.WHITE); b.setAllCaps(false); b.setBackgroundResource(R.drawable.primary_button); return b; }
     private Button soft(String s) { Button b = new Button(this); b.setText(s); b.setTextColor(GREEN); b.setAllCaps(false); b.setBackgroundResource(R.drawable.soft_button); return b; }

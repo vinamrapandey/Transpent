@@ -38,3 +38,7 @@
 - Issue: Proper installable release artifact needed outside debug build.
   - Status: Fixed.
   - Action: Exported signed release APK at `C:\Users\Lenovo\Downloads\Transpent App\Transpent-release.apk`.
+
+- Issue: Text in customer, supplier, and product cards was clipped and partly invisible because cards were forced to a fixed 48dp height while containing padded 19-22sp text.
+  - Status: Fixed.
+  - Action: Changed cards to wrap their content with a safe minimum height and adjusted title text sizing/font padding so tab content remains visible.
