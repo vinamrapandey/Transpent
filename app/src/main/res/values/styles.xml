@@ -1,9 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:fontFamily">sans</item>
+    <!-- Material Design 3 Theme – Transpent Green -->
+    <style name="AppTheme" parent="Theme.Material3.Light.NoActionBar">
+        <!-- Primary: Transpent teal-green -->
+        <item name="colorPrimary">#1E7C5A</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#B7F0D9</item>
+        <item name="colorOnPrimaryContainer">#00201A</item>
+        <!-- Secondary -->
+        <item name="colorSecondary">#4E6359</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorSecondaryContainer">#D0E8DC</item>
+        <item name="colorOnSecondaryContainer">#0B1F17</item>
+        <!-- Tertiary -->
+        <item name="colorTertiary">#3A6472</item>
+        <item name="colorOnTertiary">#FFFFFF</item>
+        <item name="colorTertiaryContainer">#BDE9FA</item>
+        <item name="colorOnTertiaryContainer">#001F28</item>
+        <!-- Error -->
+        <item name="colorError">#B3261E</item>
+        <item name="colorOnError">#FFFFFF</item>
+        <item name="colorErrorContainer">#F9DEDC</item>
+        <item name="colorOnErrorContainer">#410E0B</item>
+        <!-- Surface -->
+        <item name="colorSurface">#F8FBF9</item>
+        <item name="colorOnSurface">#191C1A</item>
+        <item name="colorSurfaceVariant">#DBE5DE</item>
+        <item name="colorOnSurfaceVariant">#404943</item>
+        <item name="colorOutline">#707973</item>
+        <!-- System bars -->
+        <item name="android:colorBackground">#F8FBF9</item>
+        <item name="android:statusBarColor">#F8FBF9</item>
+        <item name="android:navigationBarColor">#F8FBF9</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:statusBarColor">#F7F8FA</item>
-        <item name="android:navigationBarColor">#FFFFFF</item>
-        <item name="android:colorAccent">#1D6F42</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 </resources>

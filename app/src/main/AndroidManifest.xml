@@ -8,6 +8,8 @@
         android:allowBackup="true"
         android:theme="@style/AppTheme"
         android:label="Transpent"
+        android:icon="@drawable/logo_simple"
+        android:roundIcon="@drawable/logo_simple"
         android:resizeableActivity="true"
         android:usesCleartextTraffic="false">
         <activity android:name=".MainActivity" android:exported="true">
