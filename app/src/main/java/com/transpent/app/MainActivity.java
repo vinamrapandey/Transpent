@@ -59,6 +59,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int C_SUCCESS        = Color.parseColor("#1E7C5A");
     private final LedgerStore store = new LedgerStore();
     private String screen = "home";
+    private boolean ledgerShowSupplier = false;
+    private boolean homeShowSupplier  = false;
     private String selectedAccount;
     private Party selectedSupplierForBill;
     private Uri pendingCameraUri;
@@ -131,11 +133,13 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout content = column(); content.setPadding(0, 0, 0, dp(100));
         scroll.addView(content);
 
-        if ("home".equals(tab)) dashboard(content);
-        else if ("stats".equals(tab)) statistics(content);
-        else if ("customers".equals(tab)) customers(content);
-        else if ("suppliers".equals(tab)) suppliers(content);
-        else if ("export".equals(tab)) export(content);
+        if ("home".equals(tab))     dashboard(content);
+        else if ("ledger".equals(tab))   ledger(content);
+        else if ("search".equals(tab))   search(content);
+        else if ("products".equals(tab)) products(content);
+        else if ("history".equals(tab))  history(content);
+        else if ("stats".equals(tab))    statistics(content);
+        else if ("export".equals(tab))   export(content);
 
         contentLayout.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         mainRoot.addView(contentLayout);
@@ -144,18 +148,16 @@ public class MainActivity extends AppCompatActivity {
         navParams.gravity = Gravity.BOTTOM;
         mainRoot.addView(nav(), navParams);
 
-        // FAB for Customers and Suppliers
-        if ("customers".equals(tab) || "suppliers".equals(tab)) {
-            boolean isSupplier = "suppliers".equals(tab);
+        // FAB on Ledger tab
+        if ("ledger".equals(tab)) {
             FloatingActionButton fab = new FloatingActionButton(this);
             fab.setImageResource(android.R.drawable.ic_input_add);
             fab.setBackgroundTintList(ColorStateList.valueOf(C_PRIMARY));
             fab.setColorFilter(Color.WHITE);
             fab.setElevation(dp(8));
-            fab.setOnClickListener(v -> partyDialog(isSupplier, null));
+            fab.setOnClickListener(v -> partyDialog(ledgerShowSupplier, null));
             FrameLayout.LayoutParams fp = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT);
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
             fp.gravity = Gravity.BOTTOM | Gravity.END;
             fp.setMargins(0, 0, dp(24), dp(90));
             mainRoot.addView(fab, fp);
@@ -170,7 +172,13 @@ public class MainActivity extends AppCompatActivity {
         TextView t = text("Transpent", 20, C_ON_SURFACE); t.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); copy.addView(t);
         copy.addView(text("User: " + selectedAccount, 12, Color.GRAY));
         h.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView due = text("Rs " + money(store.totalDue()), 14, Color.WHITE); due.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); due.setPadding(dp(16), dp(6), dp(16), dp(6)); due.setBackground(modernBox(C_PRIMARY, 12)); h.addView(due);
+        // Show context-aware due: customers owed to us (green), suppliers we owe (blue)
+        long custDue = store.customerDue();
+        TextView due = text("Rs " + money(custDue), 14, Color.WHITE);
+        due.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        due.setPadding(dp(16), dp(6), dp(16), dp(6));
+        due.setBackground(modernBox(C_PRIMARY, 12));
+        h.addView(due);
         return h;
     }
 
@@ -180,11 +188,11 @@ public class MainActivity extends AppCompatActivity {
         bnv.setElevation(dp(8));
         android.view.Menu m = bnv.getMenu();
         m.add(0, 0, 0, "Home").setIcon(R.drawable.ic_nav_home);
-        m.add(0, 1, 1, "Stats").setIcon(R.drawable.ic_nav_stats);
-        m.add(0, 2, 2, "Customers").setIcon(R.drawable.ic_nav_customers);
-        m.add(0, 3, 3, "Suppliers").setIcon(R.drawable.ic_nav_suppliers);
-        m.add(0, 4, 4, "Export").setIcon(R.drawable.ic_nav_export);
-        int activeId = "home".equals(screen)?0:"stats".equals(screen)?1:"customers".equals(screen)?2:"suppliers".equals(screen)?3:4;
+        m.add(0, 1, 1, "Ledger").setIcon(R.drawable.ic_nav_ledger);
+        m.add(0, 2, 2, "Search").setIcon(R.drawable.ic_nav_search);
+        m.add(0, 3, 3, "Products").setIcon(R.drawable.ic_nav_products);
+        m.add(0, 4, 4, "History").setIcon(R.drawable.ic_nav_history);
+        int activeId = "home".equals(screen)?0:"ledger".equals(screen)?1:"search".equals(screen)?2:"products".equals(screen)?3:"history".equals(screen)?4:0;
         bnv.setSelectedItemId(activeId);
         ColorStateList itemColor = new ColorStateList(
             new int[][]{ new int[]{android.R.attr.state_checked}, new int[]{}},
@@ -194,10 +202,10 @@ public class MainActivity extends AppCompatActivity {
         bnv.setOnItemSelectedListener(item -> {
             int id = item.getItemId();
             if (id==0) showHome("home");
-            else if (id==1) showHome("stats");
-            else if (id==2) showHome("customers");
-            else if (id==3) showHome("suppliers");
-            else showHome("export");
+            else if (id==1) showHome("ledger");
+            else if (id==2) showHome("search");
+            else if (id==3) showHome("products");
+            else showHome("history");
             return true;
         });
         return bnv;
@@ -226,18 +234,54 @@ public class MainActivity extends AppCompatActivity {
         h.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
         c.addView(h);
 
-        // Balance card – green gradient
-        LinearLayout card = column(); card.setPadding(dp(24), dp(32), dp(24), dp(32));
-        card.setBackground(gradientBox(new int[]{Color.parseColor("#145C41"), Color.parseColor("#2BA876")}, 24));
+        // Pill switcher: Customers | Suppliers
+        LinearLayout pillRow = row(); pillRow.setPadding(dp(4), dp(4), dp(4), dp(4));
+        pillRow.setBackground(modernBox(C_SURF_VAR, 32));
+        LinearLayout.LayoutParams pillWrapLp = new LinearLayout.LayoutParams(-1, -2); pillWrapLp.setMargins(dp(20), dp(4), dp(20), dp(8));
+
+        MaterialButton hBtnCust = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        hBtnCust.setText("Customers"); hBtnCust.setAllCaps(false); hBtnCust.setCornerRadius(dp(28)); hBtnCust.setSingleLine(true);
+        MaterialButton hBtnSupp = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        hBtnSupp.setText("Suppliers"); hBtnSupp.setAllCaps(false); hBtnSupp.setCornerRadius(dp(28)); hBtnSupp.setSingleLine(true);
+
+        Runnable applyHomePill = () -> {
+            if (!homeShowSupplier) {
+                hBtnCust.setBackgroundTintList(ColorStateList.valueOf(C_PRIMARY)); hBtnCust.setTextColor(Color.WHITE);
+                hBtnSupp.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT)); hBtnSupp.setTextColor(C_ON_SURF_VAR);
+            } else {
+                hBtnSupp.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#1565C0"))); hBtnSupp.setTextColor(Color.WHITE);
+                hBtnCust.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT)); hBtnCust.setTextColor(C_ON_SURF_VAR);
+            }
+        };
+        applyHomePill.run();
+        hBtnCust.setOnClickListener(v -> { homeShowSupplier = false; showHome("home"); });
+        hBtnSupp.setOnClickListener(v -> { homeShowSupplier = true;  showHome("home"); });
+        LinearLayout.LayoutParams php = new LinearLayout.LayoutParams(0, dp(44), 1);
+        pillRow.addView(hBtnCust, php); pillRow.addView(hBtnSupp, php);
+        c.addView(pillRow, pillWrapLp);
+
+        // Balance card – changes per pill selection
+        long displayDue  = homeShowSupplier ? store.supplierDue() : store.customerDue();
+        String cardLabel = homeShowSupplier ? "Suppliers Pending (You Owe)" : "Customers Pending (They Owe You)";
+        int[] cardColors  = homeShowSupplier
+            ? new int[]{Color.parseColor("#0D2D6B"), Color.parseColor("#1976D2")}
+            : new int[]{Color.parseColor("#145C41"), Color.parseColor("#2BA876")};
+        LinearLayout card = column(); card.setPadding(dp(24), dp(28), dp(24), dp(28));
+        card.setBackground(gradientBox(cardColors, 24));
         card.setElevation(dp(8));
-        card.addView(text("Total Pending", 14, Color.parseColor("#A8D5C2")));
-        TextView bal = text("Rs " + money(store.totalDue()), 32, Color.WHITE); bal.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); card.addView(bal);
-        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.setMargins(dp(20), dp(8), dp(20), dp(16)); c.addView(card, cp);
+        card.addView(text(cardLabel, 13, Color.parseColor("#A8D5C2")));
+        card.addView(space(4));
+        TextView bal = text("Rs " + money(displayDue), 32, Color.WHITE); bal.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); card.addView(bal);
+        // Subtitle: count
+        int count = homeShowSupplier ? store.suppliers.size() : store.customers.size();
+        String who = homeShowSupplier ? "supplier" : "customer";
+        card.addView(text(count + " " + who + (count == 1 ? "" : "s"), 13, Color.parseColor("#A8D5C2")));
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.setMargins(dp(20), dp(4), dp(20), dp(16)); c.addView(card, cp);
 
         // Quick action row
         LinearLayout actions = row(); actions.setPadding(dp(12), 0, dp(12), dp(16));
-        addAction(actions, "Add",  R.drawable.ic_action_add,     v -> partyDialog(false, null));
-        addAction(actions, "Pay",  R.drawable.ic_action_pay,     v -> toast("Select a customer to record payment"));
+        addAction(actions, "Add",  R.drawable.ic_action_add,     v -> newEntryDialog());
+        addAction(actions, "Pay",  R.drawable.ic_action_pay,     v -> toast("Open a customer card to record payment"));
         addAction(actions, "Bill", R.drawable.ic_action_bill,    v -> pickBill());
         addAction(actions, "Hist", R.drawable.ic_action_history, v -> showHome("history"));
         c.addView(actions);
@@ -249,8 +293,8 @@ public class MainActivity extends AppCompatActivity {
         featLabel.setPadding(dp(20), dp(8), dp(20), dp(4)); c.addView(featLabel);
         LinearLayout grid = column();
         LinearLayout row1 = row();
-        addGridItem(row1, "Customers", R.drawable.ic_feat_customers, C_PRIMARY, v -> showHome("customers"));
-        addGridItem(row1, "Suppliers", R.drawable.ic_feat_suppliers, C_PRIMARY, v -> showHome("suppliers"));
+        addGridItem(row1, "Customers", R.drawable.ic_feat_customers, C_PRIMARY, v -> { ledgerShowSupplier=false; showHome("ledger"); });
+        addGridItem(row1, "Suppliers", R.drawable.ic_feat_suppliers, C_PRIMARY, v -> { ledgerShowSupplier=true;  showHome("ledger"); });
         grid.addView(row1);
         LinearLayout row2 = row();
         addGridItem(row2, "Export CSV", R.drawable.ic_feat_export,  Color.parseColor("#2E7D32"), v -> showHome("export"));
@@ -307,11 +351,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void settingsDialog() {
-        String[] options = {"Manage products", "Clear all data", "About"};
+        String[] options = {"Manage products", "Export CSV", "Clear all data", "About"};
         new MaterialAlertDialogBuilder(this).setTitle("Settings").setItems(options, (d, which) -> {
-            if (which == 0) toast("Product management coming soon");
-            if (which == 1) new MaterialAlertDialogBuilder(this).setTitle("Clear all data?").setMessage("This will delete all customers, suppliers and entries. This cannot be undone.").setPositiveButton("Clear", (dd, ww) -> { store.customers.clear(); store.suppliers.clear(); store.save(); showHome("home"); }).setNegativeButton("Cancel", null).show();
-            if (which == 2) new MaterialAlertDialogBuilder(this).setTitle("Transpent").setMessage("v1.0 – Local ledger tracking app").setPositiveButton("OK", null).show();
+            if (which == 0) showHome("products");
+            if (which == 1) showHome("export");
+            if (which == 2) new MaterialAlertDialogBuilder(this).setTitle("Clear all data?").setMessage("This will delete all customers, suppliers and entries.").setPositiveButton("Clear", (dd, ww) -> { store.customers.clear(); store.suppliers.clear(); store.save(); showHome("home"); }).setNegativeButton("Cancel", null).show();
+            if (which == 3) new MaterialAlertDialogBuilder(this).setTitle("Transpent").setMessage("v1.0 – Local ledger tracking app").setPositiveButton("OK", null).show();
         }).show();
     }
 
@@ -319,37 +364,44 @@ public class MainActivity extends AppCompatActivity {
         TextView title = text("Statistics", 24, C_ON_SURFACE); title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         title.setPadding(dp(24), dp(48), dp(24), dp(8)); c.addView(title);
 
-        // Compute real totals from ledger
+        // Compute real totals separately — customers and suppliers are independent
         long customerTotal = 0, customerPaid = 0, supplierTotal = 0, supplierPaid = 0;
         for (Party p : store.customers) { for (Entry e : p.items) { customerTotal += e.total(); customerPaid += e.paid; } customerPaid += p.miscPaid; }
         for (Party p : store.suppliers) { for (Entry e : p.items) { supplierTotal += e.total(); supplierPaid += e.paid; } supplierPaid += p.miscPaid; }
-        long customerDue = customerTotal - customerPaid;
-        long supplierDue = supplierTotal - supplierPaid;
+        long customerDue = Math.max(0, customerTotal - customerPaid);
+        long supplierDue = Math.max(0, supplierTotal - supplierPaid);
 
-        // Summary card
-        LinearLayout card = column(); card.setPadding(dp(24), dp(24), dp(24), dp(24));
-        card.setBackground(modernBox(Color.WHITE, 24)); card.setElevation(dp(6));
-        card.addView(text("Total Outstanding", 13, C_ON_SURF_VAR));
-        TextView bal = text("Rs " + money(store.totalDue()), 30, C_ON_SURFACE); bal.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        card.addView(bal);
-        card.addView(space(8));
-        card.addView(text(store.customers.size() + " customers  ·  " + store.suppliers.size() + " suppliers", 13, C_ON_SURF_VAR));
-        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(-1, -2); clp.setMargins(dp(20), dp(8), dp(20), dp(16)); c.addView(card, clp);
+        // ── Customers section ──
+        LinearLayout custSection = column(); custSection.setPadding(dp(20), dp(8), dp(20), dp(8));
+        TextView custHeader = text("Customers", 13, C_ON_SURF_VAR); custHeader.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        custHeader.setPadding(0, 0, 0, dp(8)); custSection.addView(custHeader);
+        LinearLayout custCard = column(); custCard.setPadding(dp(20), dp(20), dp(20), dp(20));
+        custCard.setBackground(gradientBox(new int[]{Color.parseColor("#145C41"), Color.parseColor("#2BA876")}, 20));
+        custCard.setElevation(dp(4));
+        custCard.addView(text("Customers Pending (They Owe You)", 12, Color.parseColor("#A8D5C2")));
+        custCard.addView(space(4));
+        TextView custBal = text("Rs " + money(customerDue), 28, Color.WHITE); custBal.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); custCard.addView(custBal);
+        custCard.addView(space(4));
+        custCard.addView(text(store.customers.size() + " customer" + (store.customers.size() == 1 ? "" : "s") + "  ·  Rs " + money(customerTotal) + " total", 12, Color.parseColor("#A8D5C2")));
+        custSection.addView(custCard);
+        c.addView(custSection);
 
-        // Customer vs Supplier due row
-        LinearLayout row = row(); row.setPadding(dp(20), 0, dp(20), 0);
-        LinearLayout custCard = column(); custCard.setPadding(dp(16), dp(18), dp(16), dp(18));
-        custCard.setBackground(modernBox(Color.parseColor("#145C41"), 16));
-        custCard.addView(text("Customers Due", 12, Color.parseColor("#A8D5C2")));
-        custCard.addView(text("Rs " + money(Math.max(0, customerDue)), 20, Color.WHITE));
-        row.addView(custCard, new LinearLayout.LayoutParams(0, -2, 1)); row.addView(spaceWidth(12));
+        c.addView(space(4));
 
-        LinearLayout suppCard = column(); suppCard.setPadding(dp(16), dp(18), dp(16), dp(18));
-        suppCard.setBackground(modernBox(C_PRIMARY, 16));
-        suppCard.addView(text("Suppliers Due", 12, Color.parseColor("#A8D5C2")));
-        suppCard.addView(text("Rs " + money(Math.max(0, supplierDue)), 20, Color.WHITE));
-        row.addView(suppCard, new LinearLayout.LayoutParams(0, -2, 1));
-        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, -2); rlp.setMargins(0, 0, 0, dp(16)); c.addView(row, rlp);
+        // ── Suppliers section ──
+        LinearLayout suppSection = column(); suppSection.setPadding(dp(20), dp(8), dp(20), dp(8));
+        TextView suppHeader = text("Suppliers", 13, C_ON_SURF_VAR); suppHeader.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        suppHeader.setPadding(0, 0, 0, dp(8)); suppSection.addView(suppHeader);
+        LinearLayout suppCard = column(); suppCard.setPadding(dp(20), dp(20), dp(20), dp(20));
+        suppCard.setBackground(gradientBox(new int[]{Color.parseColor("#0D2D6B"), Color.parseColor("#1976D2")}, 20));
+        suppCard.setElevation(dp(4));
+        suppCard.addView(text("Suppliers Pending (You Owe Them)", 12, Color.parseColor("#B3D4FF")));
+        suppCard.addView(space(4));
+        TextView suppBal = text("Rs " + money(supplierDue), 28, Color.WHITE); suppBal.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); suppCard.addView(suppBal);
+        suppCard.addView(space(4));
+        suppCard.addView(text(store.suppliers.size() + " supplier" + (store.suppliers.size() == 1 ? "" : "s") + "  ·  Rs " + money(supplierTotal) + " total", 12, Color.parseColor("#B3D4FF")));
+        suppSection.addView(suppCard);
+        c.addView(suppSection);
 
         // Empty state if no data
         if (store.customers.isEmpty() && store.suppliers.isEmpty()) {
@@ -359,29 +411,259 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void customers(LinearLayout c) {
-        TextView title = text("Customers", 24, C_ON_SURFACE); title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        title.setPadding(dp(24), dp(48), dp(24), dp(8)); c.addView(title);
-        summary(c, store.customers);
-        int i = 0; for (Party p : store.customers) c.addView(partyCard(p, false, i++));
-        if (store.customers.isEmpty()) {
-            TextView empty = text("No customers yet.\nTap + to add one.", 15, C_ON_SURF_VAR);
+    // ── Ledger screen (customers + suppliers combined with pill toggle) ──────
+    private void ledger(LinearLayout c) {
+        // Header
+        TextView title = text("Ledger", 24, C_ON_SURFACE); title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        title.setPadding(dp(24), dp(48), dp(24), dp(12)); c.addView(title);
+
+        // Pill toggle row
+        LinearLayout pills = row(); pills.setPadding(dp(20), 0, dp(20), dp(16));
+        pills.setBackground(modernBox(C_SURF_VAR, 32));
+        LinearLayout pillWrap = row(); pillWrap.setBackground(modernBox(C_SURF_VAR, 32));
+        pillWrap.setPadding(dp(4), dp(4), dp(4), dp(4));
+
+        MaterialButton btnCust = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnCust.setText("Customers"); btnCust.setAllCaps(false); btnCust.setCornerRadius(dp(28));
+        MaterialButton btnSupp = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnSupp.setText("Suppliers"); btnSupp.setAllCaps(false); btnSupp.setCornerRadius(dp(28));
+
+        Runnable applyPillState = () -> {
+            if (!ledgerShowSupplier) {
+                btnCust.setBackgroundTintList(ColorStateList.valueOf(C_PRIMARY)); btnCust.setTextColor(Color.WHITE);
+                btnSupp.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT)); btnSupp.setTextColor(C_ON_SURF_VAR);
+            } else {
+                btnSupp.setBackgroundTintList(ColorStateList.valueOf(C_PRIMARY)); btnSupp.setTextColor(Color.WHITE);
+                btnCust.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT)); btnCust.setTextColor(C_ON_SURF_VAR);
+            }
+        };
+        applyPillState.run();
+
+        btnCust.setOnClickListener(v -> { ledgerShowSupplier = false; showHome("ledger"); });
+        btnSupp.setOnClickListener(v -> { ledgerShowSupplier = true;  showHome("ledger"); });
+        LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(0, dp(44), 1);
+        pillWrap.addView(btnCust, pp); pillWrap.addView(btnSupp, pp);
+        LinearLayout.LayoutParams pwp = new LinearLayout.LayoutParams(-1, -2); pwp.setMargins(dp(20), 0, dp(20), dp(16));
+        c.addView(pillWrap, pwp);
+
+        ArrayList<Party> list = ledgerShowSupplier ? store.suppliers : store.customers;
+        summary(c, list);
+        int i = 0; for (Party p : list) c.addView(partyCard(p, ledgerShowSupplier, i++));
+        if (list.isEmpty()) {
+            String who = ledgerShowSupplier ? "suppliers" : "customers";
+            TextView empty = text("No " + who + " yet.\nTap + to add one.", 15, C_ON_SURF_VAR);
             empty.setGravity(Gravity.CENTER); empty.setPadding(dp(40), dp(60), dp(40), dp(40));
             c.addView(empty);
         }
     }
 
-    private void suppliers(LinearLayout c) {
-        TextView title = text("Suppliers", 24, C_ON_SURFACE); title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        title.setPadding(dp(24), dp(48), dp(24), dp(8)); c.addView(title);
-        summary(c, store.suppliers);
-        int i = 0; for (Party p : store.suppliers) c.addView(partyCard(p, true, i++));
-        if (store.suppliers.isEmpty()) {
-            TextView empty = text("No suppliers yet.\nTap + to add one.", 15, C_ON_SURF_VAR);
-            empty.setGravity(Gravity.CENTER); empty.setPadding(dp(40), dp(60), dp(40), dp(40));
-            c.addView(empty);
+    // ── Search screen ────────────────────────────────────────────────────────
+    private void search(LinearLayout c) {
+        c.setPadding(0, dp(48), 0, 0);
+        TextView title = text("Search", 24, C_ON_SURFACE); title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        title.setPadding(dp(24), 0, dp(24), dp(12)); c.addView(title);
+
+        // Search bar
+        TextInputEditText searchBar = input("Search customers, suppliers, products…");
+        LinearLayout.LayoutParams sbp = new LinearLayout.LayoutParams(-1, -2); sbp.setMargins(dp(16), 0, dp(16), dp(8));
+        c.addView((View) searchBar.getTag(), sbp);
+
+        // Results container updated as user types
+        LinearLayout results = column();
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
+        c.addView(results, rp);
+
+        // Build frequency map: partyId → entry count
+        java.util.Map<String, Integer> freq = new java.util.HashMap<>();
+        for (Party p : store.customers)  freq.put(p.id, p.items.size());
+        for (Party p : store.suppliers)  freq.put(p.id, p.items.size());
+
+        // Sort parties by frequency descending
+        ArrayList<Party> allParties = new ArrayList<>();
+        allParties.addAll(store.customers);
+        allParties.addAll(store.suppliers);
+        allParties.sort((a, b) -> Integer.compare(freq.getOrDefault(b.id, 0), freq.getOrDefault(a.id, 0)));
+
+        Runnable renderResults = new Runnable() {
+            @Override public void run() {
+                results.removeAllViews();
+                String q = val(searchBar).toLowerCase(Locale.ROOT);
+
+                if (q.isEmpty()) {
+                    // Suggestions header
+                    TextView hdr = text("Frequent contacts", 13, C_ON_SURF_VAR);
+                    hdr.setPadding(dp(24), dp(8), dp(24), dp(4)); results.addView(hdr);
+                    int shown = 0;
+                    for (Party p : allParties) {
+                        if (shown++ >= 6) break;
+                        boolean isSup = store.suppliers.contains(p);
+                        results.addView(searchResultRow(p.name, isSup ? "Supplier" : "Customer",
+                            "Rs " + money(p.due()), v -> { ledgerShowSupplier = isSup; showHome("ledger"); }));
+                    }
+                } else {
+                    boolean found = false;
+                    // Match customers
+                    for (Party p : store.customers) {
+                        if (p.name.toLowerCase(Locale.ROOT).contains(q)) {
+                            found = true;
+                            results.addView(searchResultRow(p.name, "Customer", "Rs " + money(p.due()), v -> { ledgerShowSupplier=false; showHome("ledger"); }));
+                        }
+                    }
+                    // Match suppliers
+                    for (Party p : store.suppliers) {
+                        if (p.name.toLowerCase(Locale.ROOT).contains(q)) {
+                            found = true;
+                            results.addView(searchResultRow(p.name, "Supplier", "Rs " + money(p.due()), v -> { ledgerShowSupplier=true; showHome("ledger"); }));
+                        }
+                    }
+                    // Match products
+                    for (Product pr : store.products) {
+                        if (pr.name.toLowerCase(Locale.ROOT).contains(q)) {
+                            found = true;
+                            results.addView(searchResultRow(pr.name, "Product", "Rs " + money(pr.price), v -> showHome("products")));
+                        }
+                    }
+                    if (!found) {
+                        TextView em = text("No results for \"" + val(searchBar) + "\"", 14, C_ON_SURF_VAR);
+                        em.setPadding(dp(24), dp(24), dp(24), dp(24)); results.addView(em);
+                    }
+                }
+            }
+        };
+        renderResults.run();
+        searchBar.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence s,int st,int c,int a){}
+            public void onTextChanged(CharSequence s,int st,int b,int c){ renderResults.run(); }
+            public void afterTextChanged(android.text.Editable s){}
+        });
+    }
+
+    private View searchResultRow(String name, String type, String amount, View.OnClickListener click) {
+        MaterialCardView card = new MaterialCardView(this);
+        card.setRadius(dp(14)); card.setCardElevation(dp(1));
+        card.setCardBackgroundColor(Color.WHITE); card.setStrokeColor(C_SURF_VAR); card.setStrokeWidth(dp(1));
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.setMargins(dp(16), dp(4), dp(16), dp(4));
+        LinearLayout row = row(); row.setPadding(dp(16), dp(14), dp(16), dp(14)); row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout left = column();
+        TextView nameV = text(name, 15, C_ON_SURFACE); nameV.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); left.addView(nameV);
+        int typeColor = "Customer".equals(type) ? C_PRIMARY : "Supplier".equals(type) ? Color.parseColor("#1565C0") : Color.parseColor("#E65100");
+        left.addView(text(type, 12, typeColor));
+        row.addView(left, new LinearLayout.LayoutParams(0, -2, 1));
+        row.addView(text(amount, 14, C_ON_SURF_VAR));
+        card.addView(row); card.setLayoutParams(cp); card.setOnClickListener(click);
+        return card;
+    }
+
+    // ── Products screen ──────────────────────────────────────────────────────
+    private void products(LinearLayout c) {
+        LinearLayout hRow = row(); hRow.setGravity(Gravity.CENTER_VERTICAL);
+        hRow.setPadding(dp(24), dp(48), dp(24), dp(8));
+        TextView title = text("Products", 24, C_ON_SURFACE); title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        hRow.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+        MaterialButton addBtn = modernBtn("+ Add", C_PRIMARY, Color.WHITE);
+        addBtn.setCornerRadius(dp(20));
+        addBtn.setOnClickListener(v -> productDialog(null));
+        hRow.addView(addBtn, new LinearLayout.LayoutParams(-2, dp(40)));
+        c.addView(hRow);
+
+        if (store.products.isEmpty()) {
+            TextView empty = text("No products yet. Tap + Add to create one.", 14, C_ON_SURF_VAR);
+            empty.setPadding(dp(24), dp(24), dp(24), dp(24)); c.addView(empty);
+        }
+        for (Product p : store.products) {
+            MaterialCardView card = new MaterialCardView(this);
+            card.setRadius(dp(16)); card.setCardElevation(dp(2));
+            card.setCardBackgroundColor(Color.WHITE); card.setStrokeColor(C_SURF_VAR); card.setStrokeWidth(dp(1));
+            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.setMargins(dp(16), dp(6), dp(16), dp(6));
+            LinearLayout inner = row(); inner.setPadding(dp(16), dp(14), dp(16), dp(14)); inner.setGravity(Gravity.CENTER_VERTICAL);
+            // Icon circle
+            TextView av = text(p.name.substring(0,1).toUpperCase(), 14, Color.WHITE);
+            av.setGravity(Gravity.CENTER); av.setBackground(modernBox(C_PRIMARY, 20));
+            inner.addView(av, new LinearLayout.LayoutParams(dp(36), dp(36))); inner.addView(spaceWidth(12));
+            LinearLayout names = column();
+            TextView nv = text(p.name, 15, C_ON_SURFACE); nv.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); names.addView(nv);
+            names.addView(text("Rs " + money(p.price) + " per unit", 13, C_ON_SURF_VAR));
+            inner.addView(names, new LinearLayout.LayoutParams(0, -2, 1));
+            MaterialButton edit = modernBtn("Edit", C_SURF_VAR, C_PRIMARY);
+            edit.setCornerRadius(dp(20));
+            edit.setOnClickListener(v -> productDialog(p)); inner.addView(edit, new LinearLayout.LayoutParams(dp(72), dp(36)));
+            MaterialButton del = modernBtn("", Color.parseColor("#FFEBEE"), C_ERROR);
+            del.setIcon(androidx.core.content.ContextCompat.getDrawable(this, R.drawable.ic_delete));
+            del.setIconTint(ColorStateList.valueOf(C_ERROR));
+            del.setIconGravity(com.google.android.material.button.MaterialButton.ICON_GRAVITY_TEXT_START);
+            del.setIconPadding(0);
+            del.setCornerRadius(dp(20));
+            del.setOnClickListener(v -> new MaterialAlertDialogBuilder(this).setTitle("Delete " + p.name + "?").setPositiveButton("Delete", (d,w) -> { store.products.remove(p); store.save(); showHome("products"); }).setNegativeButton("Cancel", null).show());
+            inner.addView(spaceWidth(8)); inner.addView(del, new LinearLayout.LayoutParams(dp(48), dp(36)));
+            card.addView(inner); card.setLayoutParams(cp); c.addView(card);
         }
     }
+
+    // ── History screen ───────────────────────────────────────────────────────
+    private void history(LinearLayout c) {
+        TextView title = text("History", 24, C_ON_SURFACE); title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        title.setPadding(dp(24), dp(48), dp(24), dp(8)); c.addView(title);
+
+        // Flatten all entries across customers and suppliers
+        ArrayList<Object[]> rows = new ArrayList<>(); // {partyName, isSupplier, entryName, amount, date}
+        for (Party p : store.customers) for (Entry e : p.items)
+            rows.add(new Object[]{p.name, false, e.name, e.total(), e.date});
+        for (Party p : store.suppliers) for (Entry e : p.items)
+            rows.add(new Object[]{p.name, true,  e.name, e.total(), e.date});
+
+        // Sort newest first by date string (lexicographic — works for "dd MMM yyyy, HH:mm")
+        rows.sort((a, b) -> String.valueOf(b[4]).compareTo(String.valueOf(a[4])));
+
+        if (rows.isEmpty()) {
+            TextView empty = text("No entries yet. Add customers and items to see history here.", 14, C_ON_SURF_VAR);
+            empty.setGravity(Gravity.CENTER); empty.setPadding(dp(40), dp(60), dp(40), dp(40)); c.addView(empty);
+            return;
+        }
+
+        for (Object[] row : rows) {
+            MaterialCardView card = new MaterialCardView(this);
+            card.setRadius(dp(14)); card.setCardElevation(dp(1));
+            card.setCardBackgroundColor(Color.WHITE); card.setStrokeColor(C_SURF_VAR); card.setStrokeWidth(dp(1));
+            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.setMargins(dp(16), dp(4), dp(16), dp(4));
+            LinearLayout inner = row(); inner.setPadding(dp(14), dp(12), dp(14), dp(12)); inner.setGravity(Gravity.CENTER_VERTICAL);
+            boolean isSup = (Boolean) row[1];
+            int dotColor = isSup ? Color.parseColor("#1565C0") : C_PRIMARY;
+            View dot = new View(this); dot.setBackground(modernBox(dotColor, 8));
+            inner.addView(dot, new LinearLayout.LayoutParams(dp(8), dp(8))); inner.addView(spaceWidth(12));
+            LinearLayout left = column();
+            TextView nameV = text(String.valueOf(row[0]), 14, C_ON_SURFACE); nameV.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); left.addView(nameV);
+            left.addView(text(String.valueOf(row[2]), 13, C_ON_SURF_VAR));
+            if (!String.valueOf(row[4]).isEmpty()) left.addView(text(String.valueOf(row[4]), 11, C_OUTLINE));
+            inner.addView(left, new LinearLayout.LayoutParams(0, -2, 1));
+            TextView amt = text("Rs " + money((Long) row[3]), 15, C_ON_SURFACE); amt.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            inner.addView(amt);
+            card.addView(inner); card.setLayoutParams(cp); c.addView(card);
+        }
+    }
+
+    // ── New Entry dialog (quick entry from home Add button) ──────────────────
+    private void newEntryDialog() {
+        if (store.customers.isEmpty() && store.suppliers.isEmpty()) {
+            toast("Add a customer or supplier first"); return;
+        }
+        // Build list: customers then suppliers
+        ArrayList<String> labels = new ArrayList<>();
+        ArrayList<Party> parties = new ArrayList<>();
+        ArrayList<Boolean> isSupList = new ArrayList<>();
+        for (Party p : store.customers) { labels.add("👤 " + p.name); parties.add(p); isSupList.add(false); }
+        for (Party p : store.suppliers) { labels.add("🚚 " + p.name); parties.add(p); isSupList.add(true); }
+
+        // Step 1: pick party
+        new MaterialAlertDialogBuilder(this).setTitle("Select customer / supplier")
+            .setItems(labels.toArray(new String[0]), (d, which) -> {
+                Party chosen = parties.get(which);
+                // Step 2: add item to that party
+                addItemDialog(chosen);
+            }).show();
+    }
+
+    private void customers(LinearLayout c) { ledgerShowSupplier = false; ledger(c); }
+    private void suppliers(LinearLayout c) { ledgerShowSupplier = true;  ledger(c); }
 
     private void summary(LinearLayout c, ArrayList<Party> parties) {
         int active = 0; long due = 0; for (Party p : parties) { if (p.due() > 0) active++; due += p.due(); }
@@ -418,40 +700,6 @@ public class MainActivity extends AppCompatActivity {
         card.addView(inner);
         card.setOnClickListener(v -> addItemDialog(p));
         return card;
-    }
-
-    class BarChart extends View {
-        public BarChart(android.content.Context c) { super(c); }
-        @Override protected void onDraw(android.graphics.Canvas canvas) {
-            super.onDraw(canvas);
-            android.graphics.Paint p = new android.graphics.Paint(); p.setAntiAlias(true);
-            float w = getWidth(), h = getHeight();
-            float bw = w / 14f;
-            for (int i = 0; i < 7; i++) {
-                float val1 = (float)Math.random() * h * 0.8f;
-                float val2 = (float)Math.random() * h * 0.6f;
-                p.setColor(Color.parseColor("#DBE5DE")); canvas.drawRoundRect(i*bw*2 + bw/2, h - val1, i*bw*2 + bw*1.5f, h, 8, 8, p);
-                p.setColor(Color.parseColor("#1E7C5A")); canvas.drawRoundRect(i*bw*2 + bw/2, h - val2, i*bw*2 + bw*1.5f, h, 8, 8, p);
-            }
-        }
-    }
-
-    private void products(LinearLayout c) {
-        TextView title = text("Statistics", 24, C_ON_SURFACE); title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        title.setPadding(dp(24), dp(48), 24, dp(16)); c.addView(title);
-        
-        Button add = modernBtn("Add Product Price", C_PRIMARY, Color.WHITE); add.setOnClickListener(v -> productDialog(null));
-        LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, dp(56)); ap.setMargins(dp(24), 0, dp(24), dp(16)); c.addView(add, ap);
-
-        int i = 0; for (Product p : store.products) {
-            LinearLayout card = column(); card.setBackground(modernBox(Color.WHITE, 16)); card.setPadding(dp(20), dp(16), dp(24), dp(16));
-            card.setElevation(dp(4));
-            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.setMargins(dp(24), dp(8), dp(24), dp(8)); card.setLayoutParams(cp);
-            LinearLayout r = row(); r.setGravity(Gravity.CENTER_VERTICAL);
-            LinearLayout copy = column(); TextView nameView = text(p.name, 16, C_ON_SURFACE); nameView.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); copy.addView(nameView); 
-            copy.addView(text("Rs " + money(p.price), 14, Color.GRAY)); r.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
-            Button edit = modernBtn("Edit", Color.WHITE, C_PRIMARY); edit.setOnClickListener(v -> productDialog(p)); r.addView(edit, new LinearLayout.LayoutParams(dp(80), dp(40))); card.addView(r); c.addView(card);
-        }
     }
 
     private void export(LinearLayout c) {
@@ -608,7 +856,9 @@ public class MainActivity extends AppCompatActivity {
         void load() { try { if (file().exists()) fromJson(new JSONObject(read(new FileInputStream(file())))); else seed(); } catch (Exception e) { seed(); } }
         void seed() { products.add(new Product("Rice 1kg", 60)); products.add(new Product("Sugar 1kg", 45)); products.add(new Product("Oil pouch", 130)); save(); }
         void save() { try (FileOutputStream f = new FileOutputStream(file())) { f.write(toJson().toString(2).getBytes(StandardCharsets.UTF_8)); } catch (Exception ignored) {} }
-        long totalDue() { long x = 0; for (Party p : customers) x += p.due(); for (Party p : suppliers) x += p.due(); return x; }
+        long totalDue()    { long x = 0; for (Party p : customers) x += p.due(); for (Party p : suppliers) x += p.due(); return x; }
+        long customerDue() { long x = 0; for (Party p : customers) x += p.due(); return x; }
+        long supplierDue() { long x = 0; for (Party p : suppliers) x += p.due(); return x; }
         JSONObject toJson() throws Exception { JSONObject o = new JSONObject(); o.put("products", Product.arr(products)); o.put("customers", Party.arr(customers)); o.put("suppliers", Party.arr(suppliers)); return o; }
         void fromJson(JSONObject o) throws Exception { products = Product.list(o.optJSONArray("products")); customers = Party.list(o.optJSONArray("customers")); suppliers = Party.list(o.optJSONArray("suppliers")); }
         String csv() { StringBuilder s = new StringBuilder("type,name,phone,item,qty,price,total,paid,due,date,bill_refs\n"); rows(s,"customer",customers); rows(s,"supplier",suppliers); return s.toString(); }
