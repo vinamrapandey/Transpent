@@ -1,14 +1,31 @@
-.gradle/
-.gradle-build-cache/
-build/
-app/build/
-local.properties
-keystore.properties
-release/*.jks
-*.iml
-.idea/
-.DS_Store
+# Built outputs
 *.apk
 *.aab
-emulator-*.png
-emulator-*.xml
+*.ap_
+*.dex
+
+# Build directories
+build/
+app/build/
+.gradle/
+captures/
+
+# Local config (contains machine-specific paths and secrets)
+local.properties
+*.jks
+*.keystore
+
+# IDE — Android Studio / IntelliJ
+.idea/
+*.iml
+.vscode/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Proguard
+proguard/
+
+# Test results
+test-results/
