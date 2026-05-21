@@ -9,10 +9,12 @@
 build/
 app/build/
 .gradle/
+.gradle-build-cache/
 captures/
 
 # Local config (contains machine-specific paths and secrets)
 local.properties
+keystore.properties
 *.jks
 *.keystore
 

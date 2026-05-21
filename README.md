@@ -32,14 +32,14 @@
 
 ## ✨ Features
 
-- **📊 Live Dashboard** — Total pending balance card with a green gradient, updated in real time as you record transactions
+- **📊 Context-Aware Dashboard** — Decoupled home section card with an intuitive pill switcher. Real-time outstanding balances for Customers (Emerald Green) and Suppliers (Sapphire Blue).
 - **👥 Customers Ledger** — Add customers, log items they bought (with quantity & price), record full or partial payments, attach bill photos
 - **🚚 Suppliers Ledger** — Track what you owe suppliers with the same complete entry system
-- **📈 Statistics** — Real computed breakdown of customers due vs suppliers due — no fake placeholder data
+- **📈 Statistics** — Real computed breakdown of customers due vs suppliers due represented in matching theme-colored dashboard cards
 - **📄 Export CSV** — Export your full ledger as a single CSV or separate files per party, shareable instantly
 - **☁️ Drive Backup** *(optional)* — Backup and restore the entire ledger to Google Drive when signed in
 - **🔒 Offline First** — All data stored locally on-device via JSON. No internet required for any core feature
-- **🎨 Material Design 3** — Full MD3 implementation with Transpent Green (`#1E7C5A`) brand palette, smooth cards, and contextual icons
+- **🎨 Material Design 3** — Full MD3 implementation with contextual brand palettes (Emerald Green `#145C41` & Sapphire Blue `#0D2D6B`), smooth card transitions, and dynamic action menus
 
 ---
 
