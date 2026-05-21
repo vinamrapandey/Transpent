@@ -61,6 +61,7 @@ public class MainActivity extends AppCompatActivity {
     private String screen = "home";
     private boolean ledgerShowSupplier = false;
     private boolean homeShowSupplier  = false;
+    private boolean historyShowSupplier = false;
     private String selectedAccount;
     private Party selectedSupplierForBill;
     private Uri pendingCameraUri;
@@ -234,57 +235,75 @@ public class MainActivity extends AppCompatActivity {
         h.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
         c.addView(h);
 
-        // Pill switcher: Customers | Suppliers
+        // Unified Section Card
+        int[] cardColors  = homeShowSupplier
+            ? new int[]{Color.parseColor("#0D2D6B"), Color.parseColor("#1976D2")}
+            : new int[]{Color.parseColor("#145C41"), Color.parseColor("#2BA876")};
+
+        LinearLayout sectionLayout = column();
+        sectionLayout.setPadding(dp(20), dp(20), dp(20), dp(20));
+        sectionLayout.setBackground(gradientBox(cardColors, 24));
+        sectionLayout.setElevation(dp(6));
+
+        // Pill switcher inside card
         LinearLayout pillRow = row(); pillRow.setPadding(dp(4), dp(4), dp(4), dp(4));
-        pillRow.setBackground(modernBox(C_SURF_VAR, 32));
-        LinearLayout.LayoutParams pillWrapLp = new LinearLayout.LayoutParams(-1, -2); pillWrapLp.setMargins(dp(20), dp(4), dp(20), dp(8));
+        int pillBg = homeShowSupplier ? Color.parseColor("#091F4A") : Color.parseColor("#0B3D2A");
+        pillRow.setBackground(modernBox(pillBg, 32));
+        LinearLayout.LayoutParams pillWrapLp = new LinearLayout.LayoutParams(-1, -2);
 
         MaterialButton hBtnCust = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
         hBtnCust.setText("Customers"); hBtnCust.setAllCaps(false); hBtnCust.setCornerRadius(dp(28)); hBtnCust.setSingleLine(true);
         MaterialButton hBtnSupp = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
         hBtnSupp.setText("Suppliers"); hBtnSupp.setAllCaps(false); hBtnSupp.setCornerRadius(dp(28)); hBtnSupp.setSingleLine(true);
 
-        Runnable applyHomePill = () -> {
-            if (!homeShowSupplier) {
-                hBtnCust.setBackgroundTintList(ColorStateList.valueOf(C_PRIMARY)); hBtnCust.setTextColor(Color.WHITE);
-                hBtnSupp.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT)); hBtnSupp.setTextColor(C_ON_SURF_VAR);
-            } else {
-                hBtnSupp.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#1565C0"))); hBtnSupp.setTextColor(Color.WHITE);
-                hBtnCust.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT)); hBtnCust.setTextColor(C_ON_SURF_VAR);
-            }
-        };
-        applyHomePill.run();
+        if (!homeShowSupplier) {
+            hBtnCust.setBackgroundTintList(ColorStateList.valueOf(Color.WHITE));
+            hBtnCust.setTextColor(Color.parseColor("#145C41"));
+            hBtnSupp.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT));
+            hBtnSupp.setTextColor(Color.parseColor("#A8D5C2"));
+            hBtnSupp.setStrokeColor(ColorStateList.valueOf(Color.TRANSPARENT));
+            hBtnCust.setStrokeColor(ColorStateList.valueOf(Color.TRANSPARENT));
+        } else {
+            hBtnSupp.setBackgroundTintList(ColorStateList.valueOf(Color.WHITE));
+            hBtnSupp.setTextColor(Color.parseColor("#0D2D6B"));
+            hBtnCust.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT));
+            hBtnCust.setTextColor(Color.parseColor("#B3D4FF"));
+            hBtnCust.setStrokeColor(ColorStateList.valueOf(Color.TRANSPARENT));
+            hBtnSupp.setStrokeColor(ColorStateList.valueOf(Color.TRANSPARENT));
+        }
+
         hBtnCust.setOnClickListener(v -> { homeShowSupplier = false; showHome("home"); });
         hBtnSupp.setOnClickListener(v -> { homeShowSupplier = true;  showHome("home"); });
         LinearLayout.LayoutParams php = new LinearLayout.LayoutParams(0, dp(44), 1);
         pillRow.addView(hBtnCust, php); pillRow.addView(hBtnSupp, php);
-        c.addView(pillRow, pillWrapLp);
+        sectionLayout.addView(pillRow, pillWrapLp);
 
-        // Balance card – changes per pill selection
+        // Balance details inside card
+        sectionLayout.addView(space(16));
         long displayDue  = homeShowSupplier ? store.supplierDue() : store.customerDue();
         String cardLabel = homeShowSupplier ? "Suppliers Pending (You Owe)" : "Customers Pending (They Owe You)";
-        int[] cardColors  = homeShowSupplier
-            ? new int[]{Color.parseColor("#0D2D6B"), Color.parseColor("#1976D2")}
-            : new int[]{Color.parseColor("#145C41"), Color.parseColor("#2BA876")};
-        LinearLayout card = column(); card.setPadding(dp(24), dp(28), dp(24), dp(28));
-        card.setBackground(gradientBox(cardColors, 24));
-        card.setElevation(dp(8));
-        card.addView(text(cardLabel, 13, Color.parseColor("#A8D5C2")));
-        card.addView(space(4));
-        TextView bal = text("Rs " + money(displayDue), 32, Color.WHITE); bal.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); card.addView(bal);
-        // Subtitle: count
+        sectionLayout.addView(text(cardLabel, 13, homeShowSupplier ? Color.parseColor("#B3D4FF") : Color.parseColor("#A8D5C2")));
+        sectionLayout.addView(space(4));
+        TextView bal = text("Rs " + money(displayDue), 32, Color.WHITE); bal.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        sectionLayout.addView(bal);
         int count = homeShowSupplier ? store.suppliers.size() : store.customers.size();
         String who = homeShowSupplier ? "supplier" : "customer";
-        card.addView(text(count + " " + who + (count == 1 ? "" : "s"), 13, Color.parseColor("#A8D5C2")));
-        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.setMargins(dp(20), dp(4), dp(20), dp(16)); c.addView(card, cp);
+        sectionLayout.addView(text(count + " " + who + (count == 1 ? "" : "s"), 13, homeShowSupplier ? Color.parseColor("#B3D4FF") : Color.parseColor("#A8D5C2")));
+        sectionLayout.addView(space(16));
 
-        // Quick action row
-        LinearLayout actions = row(); actions.setPadding(dp(12), 0, dp(12), dp(16));
-        addAction(actions, "Add",  R.drawable.ic_action_add,     v -> newEntryDialog());
-        addAction(actions, "Pay",  R.drawable.ic_action_pay,     v -> toast("Open a customer card to record payment"));
-        addAction(actions, "Bill", R.drawable.ic_action_bill,    v -> pickBill());
-        addAction(actions, "Hist", R.drawable.ic_action_history, v -> showHome("history"));
-        c.addView(actions);
+        // Quick action row inside card
+        LinearLayout actions = row(); actions.setPadding(0, 0, 0, dp(8));
+        int activeColor = homeShowSupplier ? Color.parseColor("#0D2D6B") : C_PRIMARY;
+        addAction(actions, "Add",  R.drawable.ic_action_add,     activeColor, Color.WHITE, v -> dashboardAddAction());
+        addAction(actions, "Pay",  R.drawable.ic_action_pay,     activeColor, Color.WHITE, v -> dashboardPayAction());
+        addAction(actions, "Hist", R.drawable.ic_action_history, activeColor, Color.WHITE, v -> {
+            historyShowSupplier = homeShowSupplier;
+            showHome("history");
+        });
+        sectionLayout.addView(actions);
+
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-1, -2); slp.setMargins(dp(20), dp(4), dp(20), dp(16));
+        c.addView(sectionLayout, slp);
 
         // Features grid
         c.addView(space(8));
@@ -301,23 +320,23 @@ public class MainActivity extends AppCompatActivity {
         addGridItem(row2, "Stats",      R.drawable.ic_feat_stats,   Color.parseColor("#E65100"), v -> showHome("stats"));
         grid.addView(row2);
         LinearLayout row3 = row();
-        addGridItem(row3, "History",  R.drawable.ic_feat_history,  Color.parseColor("#1565C0"), v -> showHome("history"));
+        addGridItem(row3, "Bills",    R.drawable.ic_action_bill,   Color.parseColor("#1565C0"), v -> billsFeatureAction());
         addGridItem(row3, "Settings", R.drawable.ic_feat_settings, Color.parseColor("#546E7A"), v -> settingsDialog());
         grid.addView(row3);
         LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(-1, -2); gp.setMargins(dp(12), 0, dp(12), dp(16));
         c.addView(grid, gp);
     }
 
-    private void addAction(LinearLayout parent, String label, int iconRes, View.OnClickListener click) {
+    private void addAction(LinearLayout parent, String label, int iconRes, int tintColor, int textColor, View.OnClickListener click) {
         LinearLayout col = column(); col.setGravity(Gravity.CENTER);
         MaterialCardView card = new MaterialCardView(this);
         card.setRadius(dp(18)); card.setCardElevation(dp(2));
         card.setCardBackgroundColor(Color.WHITE);
-        card.setStrokeColor(C_SURF_VAR); card.setStrokeWidth(dp(1));
+        card.setStrokeWidth(0);
         FrameLayout frame = new FrameLayout(this);
         ImageView iv = new ImageView(this);
         iv.setImageResource(iconRes);
-        iv.setColorFilter(C_PRIMARY);
+        iv.setColorFilter(tintColor);
         iv.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
         iv.setPadding(dp(14), dp(14), dp(14), dp(14));
         frame.addView(iv, new FrameLayout.LayoutParams(-1, -1));
@@ -325,10 +344,68 @@ public class MainActivity extends AppCompatActivity {
         card.setOnClickListener(click);
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(dp(64), dp(64));
         col.addView(card, cp);
-        TextView lbl = text(label, 12, C_ON_SURF_VAR);
+        TextView lbl = text(label, 12, textColor);
         lbl.setGravity(Gravity.CENTER); lbl.setPadding(0, dp(4), 0, 0);
         col.addView(lbl);
         parent.addView(col, new LinearLayout.LayoutParams(0, -2, 1));
+    }
+
+    private void dashboardAddAction() {
+        ArrayList<Party> list = homeShowSupplier ? store.suppliers : store.customers;
+        if (list.isEmpty()) {
+            partyDialog(homeShowSupplier, null);
+            return;
+        }
+        ArrayList<String> labels = new ArrayList<>();
+        labels.add(homeShowSupplier ? "+ Add New Supplier" : "+ Add New Customer");
+        for (Party p : list) {
+            labels.add(p.name);
+        }
+        new MaterialAlertDialogBuilder(this)
+            .setTitle(homeShowSupplier ? "Select supplier to add item" : "Select customer to add item")
+            .setItems(labels.toArray(new String[0]), (d, which) -> {
+                if (which == 0) {
+                    partyDialog(homeShowSupplier, null);
+                } else {
+                    Party chosen = list.get(which - 1);
+                    addItemDialog(chosen);
+                }
+            }).show();
+    }
+
+    private void dashboardPayAction() {
+        ArrayList<Party> list = homeShowSupplier ? store.suppliers : store.customers;
+        if (list.isEmpty()) {
+            toast(homeShowSupplier ? "Add a supplier first" : "Add a customer first");
+            return;
+        }
+        ArrayList<String> labels = new ArrayList<>();
+        for (Party p : list) {
+            labels.add(p.name + " (Pending: Rs " + money(p.due()) + ")");
+        }
+        new MaterialAlertDialogBuilder(this)
+            .setTitle(homeShowSupplier ? "Record payment to supplier" : "Record payment from customer")
+            .setItems(labels.toArray(new String[0]), (d, which) -> {
+                Party chosen = list.get(which);
+                paymentDialog(chosen);
+            }).show();
+    }
+
+    private void billsFeatureAction() {
+        if (store.suppliers.isEmpty()) {
+            toast("Add a supplier first to attach bills");
+            return;
+        }
+        ArrayList<String> labels = new ArrayList<>();
+        for (Party p : store.suppliers) {
+            labels.add(p.name);
+        }
+        new MaterialAlertDialogBuilder(this)
+            .setTitle("Attach bill for supplier")
+            .setItems(labels.toArray(new String[0]), (d, which) -> {
+                Party selected = store.suppliers.get(which);
+                billDialog(selected);
+            }).show();
     }
 
     private void addGridItem(LinearLayout parent, String label, int iconRes, int color, View.OnClickListener click) {
@@ -604,18 +681,49 @@ public class MainActivity extends AppCompatActivity {
         TextView title = text("History", 24, C_ON_SURFACE); title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         title.setPadding(dp(24), dp(48), dp(24), dp(8)); c.addView(title);
 
-        // Flatten all entries across customers and suppliers
+        // Switcher inside History
+        LinearLayout pillWrap = row(); pillWrap.setBackground(modernBox(C_SURF_VAR, 32));
+        pillWrap.setPadding(dp(4), dp(4), dp(4), dp(4));
+
+        MaterialButton btnCust = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnCust.setText("Customers"); btnCust.setAllCaps(false); btnCust.setCornerRadius(dp(28));
+        MaterialButton btnSupp = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnSupp.setText("Suppliers"); btnSupp.setAllCaps(false); btnSupp.setCornerRadius(dp(28));
+
+        Runnable applyPillState = () -> {
+            if (!historyShowSupplier) {
+                btnCust.setBackgroundTintList(ColorStateList.valueOf(C_PRIMARY)); btnCust.setTextColor(Color.WHITE);
+                btnSupp.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT)); btnSupp.setTextColor(C_ON_SURF_VAR);
+            } else {
+                btnSupp.setBackgroundTintList(ColorStateList.valueOf(C_PRIMARY)); btnSupp.setTextColor(Color.WHITE);
+                btnCust.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT)); btnCust.setTextColor(C_ON_SURF_VAR);
+            }
+        };
+        applyPillState.run();
+
+        btnCust.setOnClickListener(v -> { historyShowSupplier = false; showHome("history"); });
+        btnSupp.setOnClickListener(v -> { historyShowSupplier = true;  showHome("history"); });
+        LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(0, dp(44), 1);
+        pillWrap.addView(btnCust, pp); pillWrap.addView(btnSupp, pp);
+        LinearLayout.LayoutParams pwp = new LinearLayout.LayoutParams(-1, -2); pwp.setMargins(dp(20), 0, dp(20), dp(16));
+        c.addView(pillWrap, pwp);
+
+        // Filter and display history based on active tab
         ArrayList<Object[]> rows = new ArrayList<>(); // {partyName, isSupplier, entryName, amount, date}
-        for (Party p : store.customers) for (Entry e : p.items)
-            rows.add(new Object[]{p.name, false, e.name, e.total(), e.date});
-        for (Party p : store.suppliers) for (Entry e : p.items)
-            rows.add(new Object[]{p.name, true,  e.name, e.total(), e.date});
+        if (!historyShowSupplier) {
+            for (Party p : store.customers) for (Entry e : p.items)
+                rows.add(new Object[]{p.name, false, e.name, e.total(), e.date});
+        } else {
+            for (Party p : store.suppliers) for (Entry e : p.items)
+                rows.add(new Object[]{p.name, true,  e.name, e.total(), e.date});
+        }
 
         // Sort newest first by date string (lexicographic — works for "dd MMM yyyy, HH:mm")
         rows.sort((a, b) -> String.valueOf(b[4]).compareTo(String.valueOf(a[4])));
 
         if (rows.isEmpty()) {
-            TextView empty = text("No entries yet. Add customers and items to see history here.", 14, C_ON_SURF_VAR);
+            String who = historyShowSupplier ? "suppliers" : "customers";
+            TextView empty = text("No entries yet. Add " + who + " and items to see history here.", 14, C_ON_SURF_VAR);
             empty.setGravity(Gravity.CENTER); empty.setPadding(dp(40), dp(60), dp(40), dp(40)); c.addView(empty);
             return;
         }
