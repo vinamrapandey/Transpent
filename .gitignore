@@ -1,5 +1,6 @@
 # Built outputs
 *.apk
+!app_releases/**/*.apk
 *.aab
 *.ap_
 *.dex
